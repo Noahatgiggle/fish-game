@@ -1,0 +1,1934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fish Adventure X10</title>
+
+<style>
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+}
+
+body{
+overflow:hidden;
+background:#001b33;
+font-family:Arial,sans-serif;
+}
+
+canvas{
+display:block;
+background:#004f8f;
+}
+
+#ui{
+position:absolute;
+top:10px;
+left:10px;
+color:white;
+font-size:16px;
+font-weight:bold;
+z-index:100;
+}
+
+#shop{
+position:absolute;
+right:10px;
+top:10px;
+width:280px;
+background:rgba(0,0,0,0.85);
+padding:10px;
+color:white;
+display:none;
+z-index:100;
+}
+
+button{
+width:100%;
+padding:6px;
+margin-top:4px;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="ui">
+Loading Fish Adventure X10...
+</div>
+
+<div id="shop">
+
+<h2>🛒 Ocean Shop</h2>
+
+<button onclick="buyItem('Health Potion',100)">
+Health Potion - 100
+</button>
+
+<button onclick="buyItem('Speed Potion',150)">
+Speed Potion - 150
+</button>
+
+<button onclick="buyItem('Epic Egg',500)">
+Epic Egg - 500
+</button>
+
+<button onclick="buyItem('Legendary Egg',2000)">
+Legendary Egg - 2000
+</button>
+
+<button onclick="buyItem('Boss Key',5000)">
+Boss Key - 5000
+</button>
+
+</div>
+
+<canvas id="game"></canvas>
+
+<script>
+
+const canvas =
+document.getElementById("game");
+
+const ctx =
+canvas.getContext("2d");
+
+canvas.width =
+window.innerWidth;
+
+canvas.height =
+window.innerHeight;
+
+const WORLD_WIDTH = 100000;
+const WORLD_HEIGHT = 6000;
+
+let camera = {
+x:0,
+y:0
+};
+
+const keys = {};
+
+window.addEventListener(
+"keydown",
+e=>{
+
+keys[e.key]=true;
+
+if(
+e.key==="s" ||
+e.key==="S"
+){
+
+const shop =
+document.getElementById("shop");
+
+shop.style.display =
+shop.style.display==="block"
+?
+"none"
+:
+"block";
+
+}
+
+}
+);
+
+window.addEventListener(
+"keyup",
+e=>keys[e.key]=false
+);
+
+let player = {
+
+x:500,
+y:500,
+
+level:1,
+xp:0,
+
+coins:0,
+
+hp:100,
+maxHp:100,
+
+damage:10,
+
+speed:5,
+
+fish:"Goldfish",
+
+inventory:[],
+
+equipment:{
+crown:null,
+armor:null,
+fin:null,
+relic:null
+}
+
+};
+
+const fishSpecies = [
+
+{name:"Goldfish",rarity:"Common"},
+{name:"Clownfish",rarity:"Common"},
+{name:"Blue Tang",rarity:"Common"},
+{name:"Pufferfish",rarity:"Common"},
+{name:"Angelfish",rarity:"Common"},
+{name:"Lionfish",rarity:"Rare"},
+{name:"Swordfish",rarity:"Rare"},
+{name:"Tuna",rarity:"Rare"},
+{name:"Salmon",rarity:"Rare"},
+{name:"Manta Ray",rarity:"Rare"},
+
+{name:"Hammerhead",rarity:"Epic"},
+{name:"Electric Eel",rarity:"Epic"},
+{name:"Sea Dragon",rarity:"Epic"},
+{name:"Crystal Fish",rarity:"Epic"},
+{name:"Lava Fish",rarity:"Epic"},
+
+{name:"Ice Fish",rarity:"Legendary"},
+{name:"Shadow Fish",rarity:"Legendary"},
+{name:"Rainbow Fish",rarity:"Legendary"},
+{name:"Ancient Fish",rarity:"Legendary"},
+{name:"Leviathan",rarity:"Legendary"},
+
+{name:"Ocean Phoenix",rarity:"Mythic"},
+{name:"Void Shark",rarity:"Mythic"},
+{name:"Celestial Whale",rarity:"Mythic"},
+{name:"Sea God",rarity:"Mythic"},
+{name:"Kraken Fish",rarity:"Mythic"},
+
+{name:"Titan Leviathan",rarity:"Mythic"},
+{name:"Dragon Fish",rarity:"Mythic"},
+{name:"Abyss Emperor",rarity:"Mythic"},
+{name:"Cosmic Fish",rarity:"Mythic"},
+{name:"Infinity Whale",rarity:"Mythic"}
+
+];
+
+function gainXP(amount){
+
+player.xp += amount;
+
+if(
+player.xp >=
+player.level * 100
+){
+
+player.xp = 0;
+
+player.level++;
+
+player.maxHp += 10;
+
+player.hp =
+player.maxHp;
+
+player.damage += 2;
+
+}
+
+}
+
+function buyItem(name,cost){
+
+if(
+player.coins >= cost
+){
+
+player.coins -= cost;
+
+player.inventory.push(name);
+
+}
+
+}
+
+function saveGame(){
+
+localStorage.setItem(
+"fishAdventureX10",
+JSON.stringify(player)
+);
+
+}
+
+function loadGame(){
+
+const data =
+localStorage.getItem(
+"fishAdventureX10"
+);
+
+if(data){
+
+player =
+JSON.parse(data);
+
+}
+
+}
+
+loadGame();
+
+setInterval(
+saveGame,
+30000
+);
+
+const coins = [];
+const enemies = [];
+const bosses = [];
+const projectiles = [];
+const lootDrops = [];
+
+let currentBiome =
+"Coral Reef";// =========================
+// WORLD GENERATION
+// =========================
+
+const islands = [
+
+"Coral Reef",
+"Sunny Bay",
+"Shell Island",
+"Blue Lagoon",
+"Pearl Beach",
+"Deep Trench",
+"Sunken City",
+"Pirate Cove",
+"Ice Coast",
+"Frozen Reef",
+
+"Crystal Waters",
+"Volcano Bay",
+"Magma Sea",
+"Storm Island",
+"Thunder Reef",
+"Mystery Atoll",
+"Ancient Ruins",
+"Dragon Coast",
+"Rainbow Sea",
+"Shadow Depths",
+
+"Golden Ocean",
+"Emerald Reef",
+"Titan Island",
+"Abyss Zone",
+"Emperor Realm",
+
+"Lost Atlantis",
+"Sea God Temple",
+"Leviathan Nest",
+"Whale Kingdom",
+"Kraken Gulf",
+
+"Crystal Empire",
+"Dark Lagoon",
+"Corrupted Reef",
+"Ocean Fortress",
+"Ancient Harbor",
+
+"Frost Kingdom",
+"Blizzard Bay",
+"Volcanic Core",
+"Fire Coast",
+"Lava Trench",
+
+"Celestial Sea",
+"Void Ocean",
+"Infinity Waters",
+"Moonlit Reef",
+"Starfish Archipelago",
+
+"Dragon Empire",
+"Titan Depths",
+"Shadow Kingdom",
+"Mythic Ocean",
+"Final Abyss"
+
+];
+
+const biomes = [
+
+{
+name:"Coral",
+start:0,
+end:15000,
+color:"#0088cc"
+},
+
+{
+name:"Ice",
+start:15000,
+end:30000,
+color:"#99ddff"
+},
+
+{
+name:"Volcano",
+start:30000,
+end:45000,
+color:"#aa3300"
+},
+
+{
+name:"Ancient",
+start:45000,
+end:60000,
+color:"#448844"
+},
+
+{
+name:"Abyss",
+start:60000,
+end:80000,
+color:"#111133"
+},
+
+{
+name:"Mythic",
+start:80000,
+end:100000,
+color:"#663399"
+}
+
+];
+
+function updateBiome(){
+
+for(let biome of biomes){
+
+if(
+player.x >= biome.start &&
+player.x < biome.end
+){
+
+currentBiome =
+biome.name;
+
+}
+
+}
+
+}
+
+function updateCamera(){
+
+camera.x =
+player.x -
+canvas.width / 2;
+
+camera.y =
+player.y -
+canvas.height / 2;
+
+if(camera.x < 0)
+camera.x = 0;
+
+if(camera.y < 0)
+camera.y = 0;
+
+if(
+camera.x >
+WORLD_WIDTH - canvas.width
+){
+
+camera.x =
+WORLD_WIDTH - canvas.width;
+
+}
+
+if(
+camera.y >
+WORLD_HEIGHT - canvas.height
+){
+
+camera.y =
+WORLD_HEIGHT - canvas.height;
+
+}
+
+}
+
+function movePlayer(){
+
+if(keys["ArrowUp"])
+player.y -= player.speed;
+
+if(keys["ArrowDown"])
+player.y += player.speed;
+
+if(keys["ArrowLeft"])
+player.x -= player.speed;
+
+if(keys["ArrowRight"])
+player.x += player.speed;
+
+if(player.x < 0)
+player.x = 0;
+
+if(player.y < 0)
+player.y = 0;
+
+if(player.x > WORLD_WIDTH)
+player.x = WORLD_WIDTH;
+
+if(player.y > WORLD_HEIGHT)
+player.y = WORLD_HEIGHT;
+
+}
+
+function getCurrentIsland(){
+
+const index =
+Math.floor(
+player.x /
+(WORLD_WIDTH / islands.length)
+);
+
+return islands[
+Math.min(
+index,
+islands.length - 1
+)
+];
+
+}
+
+function spawnWorldCoin(){
+
+coins.push({
+
+x:
+Math.random() *
+WORLD_WIDTH,
+
+y:
+Math.random() *
+WORLD_HEIGHT,
+
+value:
+1 + Math.floor(
+Math.random()*5
+)
+
+});
+
+}
+
+function spawnTreasure(){
+
+lootDrops.push({
+
+x:
+Math.random() *
+WORLD_WIDTH,
+
+y:
+Math.random() *
+WORLD_HEIGHT,
+
+type:"Treasure Chest"
+
+});
+
+}
+
+setInterval(
+spawnWorldCoin,
+1000
+);
+
+setInterval(
+spawnTreasure,
+10000
+);
+
+// =========================
+// WORLD DRAWING
+// =========================
+
+function drawWorld(){
+
+let biomeColor =
+"#0088cc";
+
+for(let biome of biomes){
+
+if(
+currentBiome === biome.name
+){
+
+biomeColor =
+biome.color;
+
+}
+
+}
+
+ctx.fillStyle =
+biomeColor;
+
+ctx.fillRect(
+0,
+0,
+canvas.width,
+canvas.height
+);
+
+for(
+let i=0;
+i<islands.length;
+i++
+){
+
+const islandWidth =
+WORLD_WIDTH /
+islands.length;
+
+const islandX =
+(i * islandWidth)
+-
+camera.x;
+
+ctx.fillStyle =
+"rgba(255,255,255,0.08)";
+
+ctx.fillRect(
+islandX,
+0,
+islandWidth,
+canvas.height
+);
+
+ctx.fillStyle =
+"white";
+
+ctx.font =
+"18px Arial";
+
+ctx.fillText(
+islands[i],
+islandX + 20,
+40
+);
+
+}
+
+}// =========================
+// ENEMIES & BOSSES
+// =========================
+
+const enemyTypes = [
+
+{name:"Small Shark", hp:30, damage:5, speed:2, reward:5},
+{name:"Piranha", hp:20, damage:4, speed:3, reward:4},
+{name:"Barracuda", hp:50, damage:8, speed:4, reward:8},
+{name:"Jellyfish", hp:40, damage:6, speed:1, reward:6},
+{name:"Electric Eel", hp:60, damage:10, speed:2, reward:10},
+
+{name:"Stone Crab", hp:80, damage:12, speed:1, reward:12},
+{name:"Coral Beast", hp:100, damage:14, speed:2, reward:15},
+{name:"Ice Hunter", hp:120, damage:16, speed:3, reward:18},
+{name:"Lava Hunter", hp:150, damage:20, speed:3, reward:20},
+{name:"Shadow Stalker", hp:200, damage:25, speed:4, reward:25}
+
+];
+
+const bossTypes = [
+
+{name:"Shark King", hp:500, damage:20},
+{name:"Kraken", hp:1000, damage:30},
+{name:"Ice Titan", hp:1500, damage:40},
+{name:"Lava Beast", hp:1800, damage:45},
+{name:"Ghost Whale", hp:2200, damage:50},
+
+{name:"Deep Sea Serpent", hp:3000, damage:60},
+{name:"Storm Ray", hp:3500, damage:70},
+{name:"Coral Guardian", hp:4000, damage:80},
+{name:"Abyss Dragon", hp:5000, damage:90},
+{name:"Ocean Emperor", hp:10000, damage:120},
+
+{name:"Void Kraken", hp:12000, damage:130},
+{name:"Titan Leviathan", hp:15000, damage:150},
+{name:"Sea God", hp:18000, damage:180},
+{name:"Infinity Whale", hp:22000, damage:220},
+{name:"Celestial Dragon", hp:25000, damage:250},
+
+{name:"Ancient Titan", hp:30000, damage:280},
+{name:"Shadow Emperor", hp:35000, damage:320},
+{name:"Mythic Serpent", hp:40000, damage:350},
+{name:"Cosmic Leviathan", hp:50000, damage:400},
+{name:"Final Abyss Lord", hp:100000, damage:500}
+
+];
+
+function spawnEnemy(){
+
+const type =
+enemyTypes[
+Math.floor(
+Math.random() * enemyTypes.length
+)
+];
+
+enemies.push({
+
+name:type.name,
+
+x:
+player.x +
+800 +
+Math.random()*800,
+
+y:
+Math.random() *
+WORLD_HEIGHT,
+
+hp:type.hp,
+
+maxHp:type.hp,
+
+damage:type.damage,
+
+speed:type.speed,
+
+reward:type.reward
+
+});
+
+}
+
+function spawnBoss(){
+
+const type =
+bossTypes[
+Math.floor(
+Math.random() * bossTypes.length
+)
+];
+
+bosses.push({
+
+name:type.name,
+
+x:
+player.x + 1500,
+
+y:
+WORLD_HEIGHT/2,
+
+hp:type.hp,
+
+maxHp:type.hp,
+
+damage:type.damage,
+
+phase:1
+
+});
+
+}
+
+setInterval(
+spawnEnemy,
+2500
+);
+
+setInterval(
+spawnBoss,
+45000
+);
+
+// =========================
+// LOOT SYSTEM
+// =========================
+
+const lootTable = [
+
+"Pearl",
+"Ruby",
+"Sapphire",
+"Emerald",
+"Diamond",
+"Treasure Chest",
+"Boss Key",
+"Ancient Relic",
+"Ocean Crown",
+"Mythic Scale"
+
+];
+
+function randomLoot(){
+
+const item =
+lootTable[
+Math.floor(
+Math.random() *
+lootTable.length
+)
+];
+
+player.inventory.push(
+item
+);
+
+return item;
+
+}
+
+// =========================
+// COMBAT
+// =========================
+
+function enemyCombat(){
+
+for(
+let i=enemies.length-1;
+i>=0;
+i--
+){
+
+let enemy =
+enemies[i];
+
+let dx =
+player.x - enemy.x;
+
+let dy =
+player.y - enemy.y;
+
+let distance =
+Math.hypot(dx,dy);
+
+if(distance < 400){
+
+enemy.x +=
+(dx/distance) *
+enemy.speed;
+
+enemy.y +=
+(dy/distance) *
+enemy.speed;
+
+}
+
+if(distance < 40){
+
+enemy.hp -=
+player.damage;
+
+player.hp -=
+enemy.damage;
+
+if(enemy.hp <= 0){
+
+player.coins +=
+enemy.reward;
+
+gainXP(
+enemy.reward * 2
+);
+
+randomLoot();
+
+enemies.splice(i,1);
+
+}
+
+}
+
+}
+
+}
+
+function bossCombat(){
+
+for(
+let i=bosses.length-1;
+i>=0;
+i--
+){
+
+let boss =
+bosses[i];
+
+let dx =
+player.x - boss.x;
+
+let dy =
+player.y - boss.y;
+
+let distance =
+Math.hypot(dx,dy);
+
+if(distance < 500){
+
+boss.x +=
+(dx/distance) * 1.5;
+
+boss.y +=
+(dy/distance) * 1.5;
+
+}
+
+if(distance < 80){
+
+boss.hp -=
+player.damage;
+
+player.hp -=
+boss.damage;
+
+}
+
+if(
+boss.hp <
+boss.maxHp * 0.75
+)
+boss.phase = 2;
+
+if(
+boss.hp <
+boss.maxHp * 0.50
+)
+boss.phase = 3;
+
+if(
+boss.hp <
+boss.maxHp * 0.25
+)
+boss.phase = 4;
+
+if(boss.hp <= 0){
+
+player.coins +=
+1000;
+
+gainXP(
+500
+);
+
+const reward =
+randomLoot();
+
+alert(
+boss.name +
+" defeated!\nLoot: " +
+reward
+);
+
+bosses.splice(i,1);
+
+}
+
+}
+
+}// =========================
+// EQUIPMENT SYSTEM
+// =========================
+
+const equipmentItems = [
+
+{
+name:"Golden Crown",
+slot:"crown",
+hp:100,
+damage:0,
+speed:0,
+cost:500
+},
+
+{
+name:"Titan Armor",
+slot:"armor",
+hp:250,
+damage:0,
+speed:-1,
+cost:1500
+},
+
+{
+name:"Swift Fin",
+slot:"fin",
+hp:0,
+damage:0,
+speed:3,
+cost:1000
+},
+
+{
+name:"Ancient Relic",
+slot:"relic",
+hp:0,
+damage:50,
+speed:0,
+cost:3000
+},
+
+{
+name:"Ocean Emperor Crown",
+slot:"crown",
+hp:500,
+damage:100,
+speed:2,
+cost:10000
+}
+
+];
+
+function equipItem(itemName){
+
+const item =
+equipmentItems.find(
+i => i.name === itemName
+);
+
+if(!item) return;
+
+player.equipment[item.slot] =
+item.name;
+
+player.maxHp += item.hp;
+player.hp += item.hp;
+player.damage += item.damage;
+player.speed += item.speed;
+
+}
+
+// =========================
+// ADVANCED SHOP
+// =========================
+
+const shopItems = [
+
+{name:"Health Potion", cost:100},
+{name:"Speed Potion", cost:150},
+{name:"Epic Egg", cost:500},
+{name:"Legendary Egg", cost:2000},
+{name:"Boss Key", cost:5000}
+
+];
+
+function buyAdvanced(item){
+
+if(player.coins < item.cost)
+return false;
+
+player.coins -= item.cost;
+
+player.inventory.push(
+item.name
+);
+
+return true;
+
+}
+
+// =========================
+// FISH EVOLUTION
+// =========================
+
+const evolutions = {
+
+"Goldfish":"Golden Goldfish",
+"Clownfish":"Royal Clownfish",
+"Blue Tang":"Ocean Tang",
+"Pufferfish":"Titan Puffer",
+"Angelfish":"Celestial Angel",
+
+"Leviathan":"Titan Leviathan",
+"Sea God":"Ocean God",
+"Void Shark":"Void Emperor",
+"Cosmic Fish":"Cosmic Leviathan"
+
+};
+
+function evolveFish(){
+
+if(player.level < 10)
+return;
+
+if(
+evolutions[player.fish]
+){
+
+player.fish =
+evolutions[player.fish];
+
+player.damage += 25;
+player.maxHp += 50;
+player.hp = player.maxHp;
+
+}
+
+}
+
+// =========================
+// ABILITIES
+// =========================
+
+const abilities = {
+
+dash:{
+damage:50,
+cooldown:3000
+},
+
+bubbleBlast:{
+damage:75,
+cooldown:5000
+},
+
+electricShock:{
+damage:150,
+cooldown:7000
+},
+
+whirlpool:{
+damage:300,
+cooldown:12000
+}
+
+};
+
+let cooldowns = {
+
+dash:0,
+bubbleBlast:0,
+electricShock:0,
+whirlpool:0
+
+};
+
+function useAbility(name){
+
+const now = Date.now();
+
+if(
+now < cooldowns[name]
+)
+return;
+
+cooldowns[name] =
+now +
+abilities[name].cooldown;
+
+if(name === "dash"){
+
+player.x += 250;
+
+}
+
+if(name === "bubbleBlast"){
+
+for(
+let enemy of enemies
+){
+
+enemy.hp -=
+abilities.bubbleBlast.damage;
+
+}
+
+}
+
+if(name === "electricShock"){
+
+for(
+let enemy of enemies
+){
+
+enemy.hp -=
+abilities.electricShock.damage;
+
+}
+
+for(
+let boss of bosses
+){
+
+boss.hp -=
+abilities.electricShock.damage;
+
+}
+
+}
+
+if(name === "whirlpool"){
+
+for(
+let enemy of enemies
+){
+
+enemy.hp -=
+abilities.whirlpool.damage;
+
+}
+
+for(
+let boss of bosses
+){
+
+boss.hp -=
+abilities.whirlpool.damage;
+
+}
+
+}
+
+}
+
+// =========================
+// SKILL TREE
+// =========================
+
+player.skillPoints = 0;
+
+player.skills = {
+
+strength:0,
+vitality:0,
+agility:0
+
+};
+
+function gainLevelRewards(){
+
+player.skillPoints += 1;
+
+}
+
+function upgradeSkill(skill){
+
+if(
+player.skillPoints <= 0
+)
+return;
+
+player.skillPoints--;
+
+player.skills[skill]++;
+
+if(skill === "strength"){
+
+player.damage += 5;
+
+}
+
+if(skill === "vitality"){
+
+player.maxHp += 20;
+player.hp += 20;
+
+}
+
+if(skill === "agility"){
+
+player.speed += 0.5;
+
+}
+
+}
+
+// =========================
+// LEVEL PROGRESSION
+// =========================
+
+const originalGainXP =
+gainXP;
+
+gainXP = function(amount){
+
+const oldLevel =
+player.level;
+
+originalGainXP(amount);
+
+if(
+player.level > oldLevel
+){
+
+gainLevelRewards();
+
+}
+
+};
+
+// =========================
+// HOTKEYS
+// =========================
+
+window.addEventListener(
+"keydown",
+e => {
+
+if(e.key === "1")
+useAbility("dash");
+
+if(e.key === "2")
+useAbility("bubbleBlast");
+
+if(e.key === "3")
+useAbility("electricShock");
+
+if(e.key === "4")
+useAbility("whirlpool");
+
+if(e.key === "e")
+evolveFish();
+
+}
+);// =========================
+// QUEST SYSTEM
+// =========================
+
+const quests = [
+
+{
+id:1,
+name:"Coin Collector",
+goal:100,
+progress:0,
+reward:500,
+complete:false
+},
+
+{
+id:2,
+name:"Monster Hunter",
+goal:50,
+progress:0,
+reward:1000,
+complete:false
+},
+
+{
+id:3,
+name:"Boss Slayer",
+goal:10,
+progress:0,
+reward:5000,
+complete:false
+},
+
+{
+id:4,
+name:"Master Explorer",
+goal:25,
+progress:0,
+reward:10000,
+complete:false
+}
+
+];
+
+function updateQuest(id, amount){
+
+const quest =
+quests.find(
+q => q.id === id
+);
+
+if(!quest) return;
+
+if(quest.complete) return;
+
+quest.progress += amount;
+
+if(
+quest.progress >= quest.goal
+){
+
+quest.complete = true;
+
+player.coins +=
+quest.reward;
+
+alert(
+"Quest Complete!\n" +
+quest.name
+);
+
+}
+
+}
+
+// =========================
+// ACHIEVEMENTS
+// =========================
+
+const achievements = [
+
+{
+name:"First Coin",
+unlocked:false
+},
+
+{
+name:"Level 10",
+unlocked:false
+},
+
+{
+name:"First Boss",
+unlocked:false
+},
+
+{
+name:"Legend Hunter",
+unlocked:false
+},
+
+{
+name:"Ocean Emperor",
+unlocked:false
+}
+
+];
+
+function unlockAchievement(name){
+
+const achievement =
+achievements.find(
+a => a.name === name
+);
+
+if(
+achievement &&
+!achievement.unlocked
+){
+
+achievement.unlocked = true;
+
+player.coins += 500;
+
+alert(
+"Achievement Unlocked:\n" +
+name
+);
+
+}
+
+}
+
+// =========================
+// DAILY REWARDS
+// =========================
+
+function claimDailyReward(){
+
+const today =
+new Date()
+.toDateString();
+
+const lastReward =
+localStorage.getItem(
+"x10DailyReward"
+);
+
+if(lastReward !== today){
+
+player.coins += 1000;
+
+player.inventory.push(
+"Daily Chest"
+);
+
+localStorage.setItem(
+"x10DailyReward",
+today
+);
+
+alert(
+"Daily Reward Claimed!"
+);
+
+}
+
+}
+
+claimDailyReward();
+
+// =========================
+// STORY CAMPAIGN
+// =========================
+
+const storyChapters = [
+
+{
+title:"The Coral Beginning",
+goal:5
+},
+
+{
+title:"The Frozen Seas",
+goal:15
+},
+
+{
+title:"The Volcano Awakens",
+goal:25
+},
+
+{
+title:"The Abyss Calls",
+goal:40
+},
+
+{
+title:"The Ocean Emperor",
+goal:60
+}
+
+];
+
+let currentChapter = 0;
+
+function updateStory(){
+
+if(
+currentChapter >=
+storyChapters.length
+)
+return;
+
+const chapter =
+storyChapters[
+currentChapter
+];
+
+if(
+player.level >=
+chapter.goal
+){
+
+alert(
+"Story Complete:\n" +
+chapter.title
+);
+
+currentChapter++;
+
+}
+
+}
+
+// =========================
+// ENDGAME PROGRESSION
+// =========================
+
+const endgameItems = [
+
+"Ocean Crown",
+"Leviathan Armor",
+"Sea God Trident",
+"Abyss Relic",
+"Emperor Scale"
+
+];
+
+function unlockEndgame(){
+
+if(player.level >= 100){
+
+player.inventory.push(
+...endgameItems
+);
+
+}
+
+}
+
+// =========================
+// OCEAN EMPEROR CAMPAIGN
+// =========================
+
+const oceanEmperorCampaign = {
+
+started:false,
+
+completed:false,
+
+requiredLevel:60
+
+};
+
+function startCampaign(){
+
+if(
+player.level <
+oceanEmperorCampaign.requiredLevel
+){
+
+return;
+
+}
+
+oceanEmperorCampaign.started =
+true;
+
+alert(
+"The Ocean Emperor Awaits..."
+);
+
+}
+
+function finishCampaign(){
+
+oceanEmperorCampaign.completed =
+true;
+
+unlockAchievement(
+"Ocean Emperor"
+);
+
+player.coins +=
+50000;
+
+}
+// =========================
+// RENDERING
+// =========================
+
+function drawCoins(){
+
+ctx.fillStyle = "gold";
+
+for(let coin of coins){
+
+ctx.beginPath();
+
+ctx.arc(
+coin.x - camera.x,
+coin.y - camera.y,
+6,
+0,
+Math.PI * 2
+);
+
+ctx.fill();
+
+}
+
+}
+
+function drawLoot(){
+
+ctx.fillStyle = "orange";
+
+for(let loot of lootDrops){
+
+ctx.fillRect(
+loot.x - camera.x - 6,
+loot.y - camera.y - 6,
+12,
+12
+);
+
+}
+
+}
+
+function drawEnemies(){
+
+ctx.fillStyle = "red";
+
+for(let enemy of enemies){
+
+ctx.beginPath();
+
+ctx.arc(
+enemy.x - camera.x,
+enemy.y - camera.y,
+12,
+0,
+Math.PI * 2
+);
+
+ctx.fill();
+
+}
+
+}
+
+function drawBosses(){
+
+for(let boss of bosses){
+
+ctx.fillStyle = "purple";
+
+ctx.beginPath();
+
+ctx.arc(
+boss.x - camera.x,
+boss.y - camera.y,
+30,
+0,
+Math.PI * 2
+);
+
+ctx.fill();
+
+ctx.fillStyle = "white";
+
+ctx.fillRect(
+boss.x - camera.x - 40,
+boss.y - camera.y - 50,
+80,
+8
+);
+
+ctx.fillStyle = "lime";
+
+ctx.fillRect(
+boss.x - camera.x - 40,
+boss.y - camera.y - 50,
+80 * (boss.hp / boss.maxHp),
+8
+);
+
+ctx.fillStyle = "white";
+
+ctx.font = "12px Arial";
+
+ctx.fillText(
+boss.name,
+boss.x - camera.x - 40,
+boss.y - camera.y - 60
+);
+
+}
+
+}
+
+function drawPlayer(){
+
+ctx.fillStyle = "yellow";
+
+ctx.beginPath();
+
+ctx.arc(
+player.x - camera.x,
+player.y - camera.y,
+18,
+0,
+Math.PI * 2
+);
+
+ctx.fill();
+
+ctx.fillStyle = "black";
+
+ctx.beginPath();
+
+ctx.arc(
+player.x - camera.x + 5,
+player.y - camera.y - 4,
+2,
+0,
+Math.PI * 2
+);
+
+ctx.fill();
+
+}
+
+// =========================
+// COLLECTIONS
+// =========================
+
+function collectCoins(){
+
+for(
+let i = coins.length - 1;
+i >= 0;
+i--
+){
+
+const coin = coins[i];
+
+const distance =
+Math.hypot(
+player.x - coin.x,
+player.y - coin.y
+);
+
+if(distance < 25){
+
+player.coins += coin.value;
+
+player.score =
+(player.score || 0) +
+coin.value;
+
+gainXP(
+coin.value * 2
+);
+
+updateQuest(1,1);
+
+coins.splice(i,1);
+
+}
+
+}
+
+}
+
+function collectLoot(){
+
+for(
+let i = lootDrops.length - 1;
+i >= 0;
+i--
+){
+
+const loot = lootDrops[i];
+
+const distance =
+Math.hypot(
+player.x - loot.x,
+player.y - loot.y
+);
+
+if(distance < 30){
+
+player.inventory.push(
+loot.type
+);
+
+lootDrops.splice(i,1);
+
+}
+
+}
+
+}
+
+// =========================
+// UI
+// =========================
+
+function updateUI(){
+
+document.getElementById(
+"ui"
+).innerHTML =
+
+"🐟 Fish Adventure X10<br>" +
+
+"Level: " + player.level +
+" | XP: " + player.xp + "<br>" +
+
+"HP: " + player.hp +
+"/" + player.maxHp + "<br>" +
+
+"Coins: " + player.coins + "<br>" +
+
+"Fish: " + player.fish + "<br>" +
+
+"Biome: " + currentBiome + "<br>" +
+
+"Island: " +
+getCurrentIsland() +
+"<br>" +
+
+"Inventory: " +
+player.inventory.length +
+" items<br>" +
+
+"Skill Points: " +
+player.skillPoints;
+
+}
+
+// =========================
+// GAME UPDATE
+// =========================
+
+function updateGame(){
+
+movePlayer();
+
+updateCamera();
+
+updateBiome();
+
+collectCoins();
+
+collectLoot();
+
+enemyCombat();
+
+bossCombat();
+
+updateStory();
+
+unlockEndgame();
+
+if(player.hp <= 0){
+
+alert(
+"Game Over!\n" +
+"Level: " + player.level +
+"\nCoins: " + player.coins
+);
+
+location.reload();
+
+}
+
+}
+
+// =========================
+// RENDER
+// =========================
+
+function render(){
+
+drawWorld();
+
+drawCoins();
+
+drawLoot();
+
+drawEnemies();
+
+drawBosses();
+
+drawPlayer();
+
+updateUI();
+
+}
+
+// =========================
+// MAIN LOOP
+// =========================
+
+function gameLoop(){
+
+updateGame();
+
+render();
+
+requestAnimationFrame(
+gameLoop
+);
+
+}
+
+gameLoop();
+
+</script>
+</body>
+</html>
